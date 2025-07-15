@@ -24,16 +24,8 @@ with st.sidebar:
     
     # Analysis period
     end_date = datetime.today()
-    start_date = end_date - timedelta(days=10*365)  # 10 years data
+    start_date = end_date - timedelta(days=20*365)  # 20 years data
     st.caption(f"Analysis period: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
-    
-    # Industry averages (user can adjust)
-    st.subheader("Industry Benchmark Averages")
-    industry_sales_cagr = st.number_input("Industry Avg Sales CAGR (%)", value=10.0)
-    industry_pat_cagr   = st.number_input("Industry Avg PAT CAGR (%)", value=9.0)
-    industry_de         = st.number_input("Industry Avg Debt-to-Equity", value=0.6)
-    industry_pe         = st.number_input("Industry Avg P/E Ratio", value=18.0)
-    industry_roe        = st.number_input("Industry Avg ROE (%)", value=15.0)
 
 # Helper functions
 def get_stock_data(ticker):
@@ -41,12 +33,12 @@ def get_stock_data(ticker):
         stock = yf.Ticker(ticker)
         
         # Get historical data
-        hist = stock.history(period="10y")
+        hist = stock.history(period="20y")
         
         # Get financials
-        financials    = stock.financials
+        financials = stock.financials
         balance_sheet = stock.balance_sheet
-        cashflow      = stock.cashflow
+        cashflow = stock.cashflow
         
         # Get info dict
         info = stock.info
@@ -76,12 +68,12 @@ def calculate_fundamentals(data):
         return None
 
     try:
-        stock         = data['stock']
-        ticker        = data['ticker']
-        financials    = data['financials']
+        stock = data['stock']
+        ticker = data['ticker']
+        financials = data['financials']
         balance_sheet = data['balance_sheet']
-        cashflow      = data['cashflow']
-        info          = data['info']
+        cashflow = data['cashflow']
+        info = data['info']
 
         # Helper: pick the first row containing keyword (case-insensitive) and drop NaNs
         def safe_series(df, keyword):
@@ -102,9 +94,9 @@ def calculate_fundamentals(data):
 
         # 1) Sales & PAT CAGRs
         rev_s = safe_series(financials, 'revenue')
-        ni_s  = safe_series(financials, 'net income')
+        ni_s = safe_series(financials, 'net income')
         sales_cagr = cagr(rev_s)
-        pat_cagr   = cagr(ni_s)
+        pat_cagr = cagr(ni_s)
 
         # 2) Debt-to-Equity
         raw_de = info.get('debtToEquity')
@@ -112,7 +104,7 @@ def calculate_fundamentals(data):
             de_ratio = float(raw_de)
         else:
             try:
-                # sum any lines containing “debt”
+                # sum any lines containing "debt"
                 debt_vals = []
                 for row in balance_sheet.index:
                     if 'debt' in row.lower():
@@ -120,9 +112,9 @@ def calculate_fundamentals(data):
                         if len(val):
                             debt_vals.append(val.iloc[0])
                 total_debt = sum(debt_vals)
-                eq_s       = safe_series(balance_sheet, 'total stockholder equity')
-                equity     = eq_s.iloc[0] if len(eq_s) else 0.0
-                de_ratio   = (total_debt / equity) if equity else 0.0
+                eq_s = safe_series(balance_sheet, 'total stockholder equity')
+                equity = eq_s.iloc[0] if len(eq_s) else 0.0
+                de_ratio = (total_debt / equity) if equity else 0.0
             except:
                 de_ratio = 0.0
 
@@ -136,35 +128,35 @@ def calculate_fundamentals(data):
         else:
             try:
                 latest_ni = ni_s.iloc[0] if len(ni_s) else 0.0
-                eq_s      = safe_series(balance_sheet, 'total stockholder equity')
+                eq_s = safe_series(balance_sheet, 'total stockholder equity')
                 latest_eq = eq_s.iloc[0] if len(eq_s) else 0.0
-                roe       = (latest_ni / latest_eq) * 100 if latest_eq else 0.0
+                roe = (latest_ni / latest_eq) * 100 if latest_eq else 0.0
             except:
                 roe = 0.0
 
         # 5) Operating Cash Flow & 5Y Avg
         opcf_s = safe_series(cashflow, 'operating activities')
         if len(opcf_s):
-            cfo       = float(opcf_s.iloc[0])
-            cfo_5yr   = float(opcf_s.mean())
+            cfo = float(opcf_s.iloc[0])
+            cfo_5yr = float(opcf_s.mean())
         else:
             cfo, cfo_5yr = 0.0, 0.0
 
         # 6) Free Cash Flow & 5Y Avg
         fcf_s = safe_series(cashflow, 'free cash flow')
         if len(fcf_s):
-            fcf      = float(fcf_s.iloc[0])
-            fcf_5yr  = float(fcf_s.mean())
+            fcf = float(fcf_s.iloc[0])
+            fcf_5yr = float(fcf_s.mean())
         else:
             fcf, fcf_5yr = 0.0, 0.0
 
         # 7) Quarterly YoY growth
         try:
-            qfin   = stock.quarterly_financials
-            rev_q  = safe_series(qfin, 'revenue')
-            ni_q   = safe_series(qfin, 'net income')
+            qfin = stock.quarterly_financials
+            rev_q = safe_series(qfin, 'revenue')
+            ni_q = safe_series(qfin, 'net income')
             rev_growth = ((rev_q.iloc[0] - rev_q.iloc[4]) / abs(rev_q.iloc[4]) * 100) if len(rev_q) >= 5 and rev_q.iloc[4] else 0.0
-            ni_growth  = ((ni_q.iloc[0]  - ni_q.iloc[4])  / abs(ni_q.iloc[4])  * 100) if len(ni_q)  >= 5 and ni_q.iloc[4]  else 0.0
+            ni_growth = ((ni_q.iloc[0] - ni_q.iloc[4]) / abs(ni_q.iloc[4]) * 100) if len(ni_q) >= 5 and ni_q.iloc[4] else 0.0
         except:
             rev_growth, ni_growth = 0.0, 0.0
 
@@ -195,15 +187,31 @@ def calculate_fundamentals(data):
         st.error(f"Error calculating fundamentals for {data.get('ticker','')}: {e}")
         return None
 
-
+def calculate_industry_averages(fundamentals_list):
+    if not fundamentals_list:
+        return None
+    
+    # Create DataFrame from fundamentals
+    df = pd.DataFrame(fundamentals_list)
+    
+    # Calculate industry averages for relevant metrics
+    industry_avgs = {
+        'sales_cagr': df['Sales CAGR (5Y) %'].mean(),
+        'pat_cagr': df['PAT CAGR (5Y) %'].mean(),
+        'de': df['Debt-to-Equity'].mean(),
+        'pe': df['P/E Ratio'].mean(),
+        'roe': df['ROE %'].mean()
+    }
+    
+    return industry_avgs
 
 def calculate_scores(fundamentals, industry_avgs):
     scores = {
         'Financial Health': 0,
         'Valuation': 0,
         'Industry Position': 0,
-        'Management': 0,  # Placeholder - would need additional data
-        'Risk Factors': 0   # Placeholder - would need additional data
+        'Management': 0,  # Placeholder
+        'Risk Factors': 0   # Placeholder
     }
     
     # Financial Health (max 10 points)
@@ -245,31 +253,28 @@ def calculate_scores(fundamentals, industry_avgs):
         scores['Valuation'] += 1
     
     # P/B Ratio (3 points) - placeholder
-    # Assuming P/B is reasonable if P/E is reasonable
     if fundamentals['P/E Ratio'] < industry_avgs['pe']:
         scores['Valuation'] += 3
     elif fundamentals['P/E Ratio'] < industry_avgs['pe'] * 1.2:
         scores['Valuation'] += 1
     
     # PEG Ratio (4 points) - placeholder
-    # Assuming PEG is reasonable if growth is good
     if fundamentals['PAT CAGR (5Y) %'] > industry_avgs['pat_cagr'] and fundamentals['P/E Ratio'] < industry_avgs['pe']:
         scores['Valuation'] += 4
     elif fundamentals['PAT CAGR (5Y) %'] > industry_avgs['pat_cagr']:
         scores['Valuation'] += 2
     
-    # Industry Position (max 10 points) - simplified
-    # Assuming all stocks are in the same industry for this demo
+    # Industry Position (max 10 points)
     scores['Industry Position'] = 6  # Baseline
     if fundamentals['Sales CAGR (5Y) %'] > industry_avgs['sales_cagr']:
         scores['Industry Position'] += 2
     if fundamentals['ROE %'] > industry_avgs['roe']:
         scores['Industry Position'] += 2
     
-    # Management (placeholder) - assume average
+    # Management (placeholder)
     scores['Management'] = 6
     
-    # Risk Factors (placeholder) - assume average
+    # Risk Factors (placeholder)
     scores['Risk Factors'] = 6
     
     # Calculate total score
@@ -301,14 +306,6 @@ else:
     fundamentals_list = []
     scores_list = []
     
-    industry_avgs = {
-        'sales_cagr': industry_sales_cagr,
-        'pat_cagr': industry_pat_cagr,
-        'de': industry_de,
-        'pe': industry_pe,
-        'roe': industry_roe
-    }
-    
     for i, ticker in enumerate(tickers):
         status_text.text(f"Fetching data for {ticker} ({i+1}/{len(tickers)})...")
         progress_bar.progress((i + 1) / len(tickers))
@@ -321,13 +318,17 @@ else:
             fundamentals = calculate_fundamentals(data)
             if fundamentals:
                 fundamentals_list.append(fundamentals)
-                
-                # Calculate scores
-                scores = calculate_scores(fundamentals, industry_avgs)
-                scores_list.append({
-                    'Ticker': ticker,
-                    **scores
-                })
+    
+    # Calculate industry averages based on fetched data
+    industry_avgs = calculate_industry_averages(fundamentals_list)
+    
+    # Now calculate scores with the industry averages
+    for fundamentals in fundamentals_list:
+        scores = calculate_scores(fundamentals, industry_avgs)
+        scores_list.append({
+            'Ticker': fundamentals['Ticker'],
+            **scores
+        })
     
     status_text.text("Analysis complete!")
     progress_bar.empty()
@@ -371,9 +372,19 @@ else:
     }
     formatted_df.loc['Industry Avg'] = industry_row
     
+    # Display industry averages in sidebar
+    with st.sidebar:
+        st.subheader("Calculated Industry Averages")
+        st.markdown(f"""
+        - **Sales CAGR (5Y):** {industry_avgs['sales_cagr']:.1f}%
+        - **PAT CAGR (5Y):** {industry_avgs['pat_cagr']:.1f}%
+        - **Debt-to-Equity:** {industry_avgs['de']:.2f}
+        - **P/E Ratio:** {industry_avgs['pe']:.1f}
+        - **ROE:** {industry_avgs['roe']:.1f}%
+        """)
+    
     # Display fundamentals table
     st.subheader("Fundamental Metrics Comparison")
-
     st.dataframe(
         formatted_df.style.applymap(
             lambda x: 'color: green' if ('%' in x and float(x.replace('%','')) > 0) else 
@@ -381,15 +392,12 @@ else:
             subset=[col for col in formatted_df.columns if '%' in col]
         )
     )
-
     
     # Display scores
     st.subheader("Stock Scoring System")
     scores_df = pd.DataFrame(scores_list)
     scores_df.set_index('Ticker', inplace=True)
     
-    # Format scores
-    # 1) Component score text colors (unchanged)
     def color_score(val):
         if val >= 7:
             return 'color: green; font-weight: bold;'
@@ -398,30 +406,28 @@ else:
         else:
             return 'color: red; font-weight: bold;'
 
-    # 2) Total-Score bands, with light backgrounds + contrasting text
     def style_total(val):
         if val >= 36:
             return (
-                'background-color: rgba(46, 125, 50, 0.2); '  # light green wash
+                'background-color: rgba(46, 125, 50, 0.2); '
                 'color: #1b5e20; font-weight: bold;'
             )
         elif val >= 30:
             return (
-                'background-color: rgba(165, 214, 167, 0.2); '  # pale mint
+                'background-color: rgba(165, 214, 167, 0.2); '
                 'color: #2e7d32; font-weight: bold;'
             )
         elif val >= 21:
             return (
-                'background-color: rgba(255, 249, 196, 0.2); '  # pale yellow
+                'background-color: rgba(255, 249, 196, 0.2); '
                 'color: #f9a825; font-weight: bold;'
             )
         else:
             return (
-                'background-color: rgba(239, 154, 154, 0.2); '  # pale red
+                'background-color: rgba(239, 154, 154, 0.2); '
                 'color: #c62828; font-weight: bold;'
             )
 
-    # 3) Recommendation text
     def reco_color(val):
         if val in ['Strong Buy','Buy']:
             return 'color: green; font-weight: bold;'
@@ -435,9 +441,8 @@ else:
             .applymap(color_score,
                       subset=['Financial Health','Valuation','Industry Position','Management','Risk Factors'])
             .applymap(style_total, subset=['Total Score'])
-            .applymap(reco_color,  subset=['Recommendation'])
+            .applymap(reco_color, subset=['Recommendation'])
     )
-
     
     # Display interpretation
     st.subheader("Interpretation Guide")
